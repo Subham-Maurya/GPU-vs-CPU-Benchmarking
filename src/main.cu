@@ -7,23 +7,23 @@
 
 // ===================== VECTOR ADD =====================
 __global__ void vectorAddGPU(float *A, float *B, float *C, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) C[i] = A[i] + B[i];
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) C[idx] = A[idx] + B[idx];
 }
 
 void vectorAddCPU(std::vector<float>& A, std::vector<float>& B, std::vector<float>& C) {
-    for (int i = 0; i < A.size(); i++)
+    for (size_t i = 0; i < A.size(); i++)
         C[i] = A[i] + B[i];
 }
 
 // ===================== SAXPY =====================
 __global__ void saxpyGPU(float a, float *x, float *y, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) y[i] = a * x[i] + y[i];
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) y[idx] = a * x[idx] + y[idx];
 }
 
 void saxpyCPU(float a, std::vector<float>& x, std::vector<float>& y) {
-    for (int i = 0; i < x.size(); i++)
+    for (size_t i = 0; i < x.size(); i++)
         y[i] = a * x[i] + y[i];
 }
 
@@ -32,9 +32,9 @@ __global__ void reduceSumGPU(float *input, float *output, int n) {
     __shared__ float sdata[THREADS];
 
     int tid = threadIdx.x;
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    sdata[tid] = (i < n) ? input[i] : 0;
+    sdata[tid] = (gid < n) ? input[gid] : 0;
     __syncthreads();
 
     for (int s = blockDim.x / 2; s > 0; s >>= 1) {
@@ -48,21 +48,21 @@ __global__ void reduceSumGPU(float *input, float *output, int n) {
 }
 
 float reduceCPU(std::vector<float>& data) {
-    float sum = 0;
-    for (float v : data) sum += v;
-    return sum;
+    float total = 0;
+    for (size_t i = 0; i < data.size(); i++) total += data[i];
+    return total;
 }
 
 // ===================== MATRIX MULT =====================
 __global__ void matMulGPU(float *A, float *B, float *C, int N) {
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int r = blockIdx.y * blockDim.y + threadIdx.y;
+    int c = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (row < N && col < N) {
-        float sum = 0;
+    if (r < N && c < N) {
+        float acc = 0;
         for (int k = 0; k < N; k++)
-            sum += A[row * N + k] * B[k * N + col];
-        C[row * N + col] = sum;
+            acc += A[r * N + k] * B[k * N + c];
+        C[r * N + c] = acc;
     }
 }
 
@@ -98,17 +98,17 @@ void benchmarkVector(int n) {
     vectorAddCPU(A,B,C);
     auto cpu_end = std::chrono::high_resolution_clock::now();
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    cudaEvent_t t0, t1;
+    cudaEventCreate(&t0);
+    cudaEventCreate(&t1);
 
-    cudaEventRecord(start);
+    cudaEventRecord(t0);
     vectorAddGPU<<<(n+THREADS-1)/THREADS, THREADS>>>(d_A,d_B,d_C,n);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    cudaEventRecord(t1);
+    cudaEventSynchronize(t1);
 
     float gpu_time;
-    cudaEventElapsedTime(&gpu_time,start,stop);
+    cudaEventElapsedTime(&gpu_time,t0,t1);
 
     std::cout << "Size: " << n
               << " | CPU: " << std::chrono::duration<double, std::milli>(cpu_end-cpu_start).count()
@@ -135,17 +135,17 @@ void benchmarkSAXPY(int n) {
     saxpyCPU(a,x,y);
     auto cpu_end = std::chrono::high_resolution_clock::now();
 
-    cudaEvent_t start,stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    cudaEvent_t t0,t1;
+    cudaEventCreate(&t0);
+    cudaEventCreate(&t1);
 
-    cudaEventRecord(start);
+    cudaEventRecord(t0);
     saxpyGPU<<<(n+THREADS-1)/THREADS,THREADS>>>(a,d_x,d_y,n);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    cudaEventRecord(t1);
+    cudaEventSynchronize(t1);
 
     float gpu_time;
-    cudaEventElapsedTime(&gpu_time,start,stop);
+    cudaEventElapsedTime(&gpu_time,t0,t1);
 
     std::cout << "Size: " << n
               << " | CPU: " << std::chrono::duration<double, std::milli>(cpu_end-cpu_start).count()
@@ -169,17 +169,17 @@ void benchmarkReduction(int n) {
     reduceCPU(data);
     auto cpu_end = std::chrono::high_resolution_clock::now();
 
-    cudaEvent_t start,stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    cudaEvent_t t0,t1;
+    cudaEventCreate(&t0);
+    cudaEventCreate(&t1);
 
-    cudaEventRecord(start);
+    cudaEventRecord(t0);
     reduceSumGPU<<<(n+THREADS-1)/THREADS,THREADS>>>(d_in,d_out,n);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    cudaEventRecord(t1);
+    cudaEventSynchronize(t1);
 
     float gpu_time;
-    cudaEventElapsedTime(&gpu_time,start,stop);
+    cudaEventElapsedTime(&gpu_time,t0,t1);
 
     std::cout << "Size: " << n
               << " | CPU: " << std::chrono::duration<double, std::milli>(cpu_end-cpu_start).count()
@@ -208,17 +208,17 @@ void benchmarkMatrix(int N) {
     dim3 threads(16,16);
     dim3 blocks((N+15)/16,(N+15)/16);
 
-    cudaEvent_t start,stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    cudaEvent_t t0,t1;
+    cudaEventCreate(&t0);
+    cudaEventCreate(&t1);
 
-    cudaEventRecord(start);
+    cudaEventRecord(t0);
     matMulGPU<<<blocks,threads>>>(d_A,d_B,d_C,N);
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
+    cudaEventRecord(t1);
+    cudaEventSynchronize(t1);
 
     float gpu_time;
-    cudaEventElapsedTime(&gpu_time,start,stop);
+    cudaEventElapsedTime(&gpu_time,t0,t1);
 
     std::cout << "Size: " << N << "x" << N
               << " | CPU: " << std::chrono::duration<double, std::milli>(cpu_end-cpu_start).count()
