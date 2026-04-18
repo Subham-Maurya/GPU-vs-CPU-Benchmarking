@@ -1,0 +1,21 @@
+===== GPU vs CPU Benchmark (Scaling) =====
+
+[Vector Add]
+Size: 1024 | CPU: 0.015947 ms | GPU: 0.082944 ms
+Size: 1048576 | CPU: 8.06124 ms | GPU: 0.073728 ms
+Size: 16777216 | CPU: 149.816 ms | GPU: 1.0711 ms
+
+[SAXPY]
+Size: 1024 | CPU: 0.011337 ms | GPU: 0.026816 ms
+Size: 1048576 | CPU: 9.74414 ms | GPU: 0.18944 ms
+Size: 16777216 | CPU: 133.089 ms | GPU: 1.18288 ms
+
+[Reduction]
+Size: 1024 | CPU: 0.00873 ms | GPU: 0.022336 ms
+Size: 1048576 | CPU: 9.95757 ms | GPU: 0.202272 ms
+Size: 16777216 | CPU: 141.229 ms | GPU: 1.4503 ms
+
+[Matrix Multiplication]
+Size: 64x64 | CPU: 1.4243 ms | GPU: 0.04608 ms
+Size: 128x128 | CPU: 10.599 ms | GPU: 0.018336 ms
+Size: 256x256 | CPU: 94.4518 ms | GPU: 0.198976 ms
